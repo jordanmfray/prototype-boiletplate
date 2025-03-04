@@ -13,24 +13,46 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// User model - represents application users
 model User {
-  id    Int    @id @default(autoincrement())
-  email String @unique
-  name  String
+  id            Int      @id @default(autoincrement())
+  email         String   @unique
+  name          String?
+  passwordHash  String
+  role          Role     @default(USER)
+  bio           String?
+  avatarUrl     String?
+  pages         Page[]   // Relation to pages owned by this user
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
-model Organization {
-  Id                Int     @id @default(autoincrement())
-  Ein               String  @unique
-  Name              String
-  WebsiteUrl        String? @unique
-  GuideStarURL      String? @unique
-  NteeCode          String?
-  NteeDescription   String?
-  BusinessZip       String?
-  RegionServed      String?
-  About             String?
-  OrgImages         String?
-  LogoURL           String?
-  Tags              String?
+// Page model - represents content pages created by users
+model Page {
+  id          Int       @id @default(autoincrement())
+  title       String
+  slug        String    @unique
+  content     String
+  isPublished Boolean   @default(false)
+  viewCount   Int       @default(0)
+  userId      Int       // Foreign key to User
+  user        User      @relation(fields: [userId], references: [id])
+  tags        Tag[]     // Many-to-many relation with Tag
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// Tag model - for categorizing pages
+model Tag {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  pages     Page[]   // Many-to-many relation with Page
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// User role enum
+enum Role {
+  USER
+  ADMIN
 }

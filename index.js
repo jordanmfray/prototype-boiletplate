@@ -1,161 +1,258 @@
 // Import necessary modules
 import dotenv from 'dotenv';
-import axios from 'axios';
-import express from 'express';
-import { load } from 'cheerio';
-import TurndownService from 'turndown';
-import OpenAI from 'openai';
-import pkg from '@prisma/client';
-const { PrismaClient, Organization, User } = pkg;
-
-// Load environment variables
 dotenv.config();
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-// const app = express();
 
+import express from 'express';
+// Import Prisma
+import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
-const turndownService = new TurndownService();
+
+const app = express();
+const port = process.env.PORT || 3000;
+
+// Middleware to parse JSON bodies
+app.use(express.json());
+app.use(express.static('dist'));
+
+// OpenAI
+import OpenAI from 'openai';
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const openai = new OpenAI({apiKey: OPENAI_API_KEY});
 
-console.log("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-
-// Find or create organization in database by EIN
-async function findOrCreateOrganizationByEin(ein) {
-    let organization = await prisma.organization.findFirst({
-        where: {
-            Ein: ein
-        }
+// Example API endpoint - now uses the database
+app.get('/api/example', async (req, res) => {
+  try {
+    // Fetch recent pages from the database
+    const recentPages = await prisma.page.findMany({
+      where: { isPublished: true },
+      orderBy: { createdAt: 'desc' },
+      take: 3,
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true
+          }
+        },
+        tags: true
+      }
     });
-
-    if (!organization) {
-        console.log("Creating new organization with EIN: " + ein);
-        // Scrape GuideStar nonprofit profile
-        const guideStarProfile = await scrapeGuideStarProfileByEin(ein);
-        const profileData = JSON.parse(guideStarProfile);
-        
-        // Create a new organization with just the EIN
-        const newOrganization = await prisma.organization.create({
-            data: { 
-                Ein: ein,
-                Name: profileData.Name,
-                WebsiteUrl: profileData.WebsiteUrl,
-                GuideStarURL: `https://www.guidestar.org/profile/${ein}`,
-                NteeCode: profileData.NteeCode,
-                NteeDescription: profileData.NteeDescription,
-                BusinessZip: profileData.ZipCode,
-            }
-        });
-        return newOrganization;
-    }
-    return organization;
-}
-
-const organization = await findOrCreateOrganizationByEin('75-3139219');
-console.log("New organization created: " + organization);
-
-//Scrape GuideStar nonprofit profile and save to database
-async function scrapeGuideStarProfileByEin(ein) {
-    const response = await axios.get(`https://www.guidestar.org/profile/${ein}`);
-    const html = response.data;
-    const markdown = turndownService.turndown(html);
-    const prompt = 'Extract the following data from the nonprofit profile using the following key value pairs: ' +
-    'Name\n' +
-    'WebsiteUrl\n' +
-    'NteeCode\n' +
-    'NteeDescription\n' +
-    'ZipCode\n' +
-    '\n' +
-    'Return the data in JSON format. Only return the JSON, no other text or comments.\n' +
-    'Here is the profile: ' + markdown;
-    const profileData = await ChatGPTRequest(prompt);
-    console.log("Profile data: " + profileData);
-    return profileData;
-}
-
-async function ChatGPTRequest(prompt) {
-    try {
-        const response = await openai.chat.completions.create({
-            model: "gpt-4",
-            messages: [{ role: "user", content: prompt }]
-        });
-        
-        const answer = response.choices[0].message.content;
-        return answer;
-    } catch (error) {
-        console.error("Error interacting with ChatGPT:", error);
-    }
-}
-
-// Function to get unique URLs from HTML
-function get_unique_urls_from_html(html, starting_with_url) {
-    const urls = [];
-    const $ = load(html);
-    $('a').each((index, a) => {
-        const href = $(a).attr('href');
-        if (!href) return;
-
-        // Convert relative URLs to absolute
-        const absoluteUrl = new URL(href, starting_with_url).href;
-        if (href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:') || href.startsWith('data:') || href.includes('#') || href.startsWith('javascript:')) return;
-
-        if (absoluteUrl.startsWith(starting_with_url)) {
-            urls.push(absoluteUrl);
+    
+    // Get popular tags
+    const tags = await prisma.tag.findMany({
+      include: {
+        _count: {
+          select: { pages: true }
         }
+      }
     });
-    return [...new Set(urls)];
-}
+    
+    const popularTags = tags
+      .map(tag => ({ name: tag.name, count: tag._count.pages }))
+      .sort((a, b) => b.count - a.count);
+    
+    res.json({
+      recentPages,
+      popularTags
+    });
+  } catch (error) {
+    console.error('Error fetching example data:', error);
+    res.status(500).json({ error: 'Failed to fetch data' });
+  }
+});
 
-// Function to scrape a URL and return HTML and Markdown
-async function scrapeUrl(url_to_scrape) {
-    try {
-        const response = await axios.get(url_to_scrape);
-        const html = response.data;
-        // console.log(html);
-        const markdown = turndownService.turndown(html);
-        // console.log(markdown);
-        return { html, markdown }; // Return both HTML and Markdown
-    } catch (error) {
-        console.error('Error fetching data:', error);
-        return { html: null, markdown: null }; // Return nulls in case of error
-    }
-}
-
-// Function to scrape a URL and extract unique URLs
-async function scrapeAndExtractUrls(url_to_scrape) {
-    try {
-        const { html, markdown } = await scrapeUrl(url_to_scrape);
-        if (html) {
-            const urls_on_page = get_unique_urls_from_html(html, url_to_scrape);
-            return urls_on_page; // Return the extracted URLs
+// User API endpoints
+app.get('/api/users', async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        bio: true,
+        avatarUrl: true,
+        createdAt: true,
+        _count: {
+          select: { pages: true }
         }
-        return [];
-    } catch (error) {
-        console.error('Error scraping and extracting URLs:', error);
-        return [];
+      }
+    });
+    res.json(users);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+app.get('/api/users/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await prisma.user.findUnique({
+      where: { id: Number(id) },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        bio: true,
+        avatarUrl: true,
+        createdAt: true,
+        pages: {
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            isPublished: true,
+            viewCount: true,
+            createdAt: true,
+            updatedAt: true
+          }
+        }
+      }
+    });
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
     }
+    
+    res.json(user);
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    res.status(500).json({ error: 'Failed to fetch user' });
+  }
+});
+
+// Page API endpoints
+app.get('/api/pages', async (req, res) => {
+  try {
+    const pages = await prisma.page.findMany({
+      where: { isPublished: true },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true
+          }
+        },
+        tags: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(pages);
+  } catch (error) {
+    console.error('Error fetching pages:', error);
+    res.status(500).json({ error: 'Failed to fetch pages' });
+  }
+});
+
+app.get('/api/pages/:slug', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const page = await prisma.page.findUnique({
+      where: { slug },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+            bio: true
+          }
+        },
+        tags: true
+      }
+    });
+    
+    if (!page) {
+      return res.status(404).json({ error: 'Page not found' });
+    }
+    
+    // Increment view count
+    await prisma.page.update({
+      where: { id: page.id },
+      data: { viewCount: { increment: 1 } }
+    });
+    
+    res.json(page);
+  } catch (error) {
+    console.error('Error fetching page:', error);
+    res.status(500).json({ error: 'Failed to fetch page' });
+  }
+});
+
+// AI generation endpoint
+app.post('/api/ai/generate', async (req, res) => {
+  try {
+    const { prompt } = req.body;
+    
+    if (!prompt) {
+      return res.status(400).json({ error: 'Prompt is required' });
+    }
+    
+    const response = await ChatGPTRequest(prompt);
+    res.json({ response });
+  } catch (error) {
+    console.error('Error generating AI response:', error);
+    res.status(500).json({ error: 'Failed to generate AI response' });
+  }
+});
+
+// AI content enhancement endpoint
+app.post('/api/ai/enhance-content', async (req, res) => {
+  try {
+    const { content, enhancementType } = req.body;
+    
+    if (!content) {
+      return res.status(400).json({ error: 'Content is required' });
+    }
+    
+    let prompt;
+    switch (enhancementType) {
+      case 'grammar':
+        prompt = `Improve the grammar and readability of the following text without changing its meaning: "${content}"`;
+        break;
+      case 'expand':
+        prompt = `Expand on the following text with more details and examples: "${content}"`;
+        break;
+      case 'summarize':
+        prompt = `Summarize the following text in a concise way: "${content}"`;
+        break;
+      default:
+        prompt = `Enhance the following text to make it more engaging and professional: "${content}"`;
+    }
+    
+    const enhancedContent = await ChatGPTRequest(prompt);
+    res.json({ enhancedContent });
+  } catch (error) {
+    console.error('Error enhancing content:', error);
+    res.status(500).json({ error: 'Failed to enhance content' });
+  }
+});
+
+// Helper function for OpenAI requests
+async function ChatGPTRequest(prompt, model = "gpt-4o-mini") {
+  try {
+    const response = await openai.chat.completions.create({
+      model: model,
+      messages: [{ role: "user", content: prompt }]
+    });
+    
+    const answer = response.choices[0].message.content;
+    return answer;
+  } catch (error) {
+    console.error("Error interacting with ChatGPT:", error);
+    throw error;
+  }
 }
 
-const urls = await scrapeAndExtractUrls('https://pastorserve.org');
-// console.log('Extracted URLs:', urls);
+// Catch-all route for SPA
+app.get('*', (req, res) => {
+  res.sendFile('index.html', { root: 'dist' });
+});
 
-const urls_to_scrape = await ChatGPTRequest(
-    `Below is a list of URLs from the nonprofit organization's website:
-    ${urls.map((u, i) => `${i + 1}. ${u}`).join('\n')}
-
-        return up to 10 urls that are most likely to contain content about the organization, their programs, and their impact.
-        Do not include url's that appear to be blog posts, login pages, privacy policies, or other non-content pages.
-        Return the urls in an array format using JSON.stringify().
-    `
-);
-const parsedUrls = JSON.parse(urls_to_scrape);
-console.log("URLs to scrape: " + parsedUrls);
-
-console.log("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-
-
-// await prisma.organization.update({
-//     where: { 
-//         website_url: url_to_scrape,
-//         name: 'Pastorserve'
-//      }
-// });
+app.listen(port, () => {
+  console.log(`Server running at http://localhost:${port}`);
+});
