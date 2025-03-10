@@ -4,12 +4,13 @@ A full-stack React + Express + Prisma + OpenAI boilerplate for quickly building 
 
 ## Features
 
-- 🚀 Express backend with OpenAI integration
-- ⚛️ React frontend with Vite for fast development
-- 🗄️ PostgreSQL database with Prisma ORM
-- 🔄 Concurrent development mode for frontend and backend
-- 🧰 Interactive setup script for quick start
-- 🌱 Database seeding with sample data
+- Express backend with OpenAI integration
+- React frontend with Vite for fast development
+- Radix-ui frontend comononents
+- PostgreSQL database with Prisma ORM
+- Concurrent development mode for frontend and backend
+- Interactive setup script for quick start
+- Database seeding with sample data
 
 ## Prerequisites
 
@@ -95,8 +96,6 @@ This will start both the backend server and the frontend development server conc
 ├── src/                    # Frontend React application
 │   ├── App.jsx             # Main React component
 │   ├── main.jsx            # React entry point
-│   ├── components/         # Reusable React components
-│   └── pages/              # Page components
 ├── .env                    # Environment variables
 ├── setup.js                # Interactive setup script
 └── package.json            # Project dependencies and scripts
