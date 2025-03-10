@@ -194,7 +194,7 @@ function PageDetail() {
           
           <Flex align="center" gap="2">
             <Text size="2" color="gray">
-              Created: {new Date(page.createdAt).toLocaleDateString()}
+              By: {page.author} | Created: {new Date(page.createdAt).toLocaleDateString()}
             </Text>
             <Badge size="1">{page.category}</Badge>
           </Flex>

@@ -6,12 +6,14 @@ import App from './App'
 import "@radix-ui/themes/styles.css";
 import { Theme } from "@radix-ui/themes";
 
+console.log('main.jsx loaded');
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
       <Theme
         appearance="light" // or "dark"
-        accentColor="teal" // primary color: blue, green, red, etc.
+        accentColor="red" // primary color: blue, green, red, etc.
         grayColor="slate" // neutral color: slate, mauve, olive, etc.
         radius="large" // border radius: none, small, medium, large, full
         scaling="100%" // size scaling

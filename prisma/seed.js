@@ -1,13 +1,6 @@
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
-
-// Function to hash passwords
-async function hashPassword(password) {
-  const saltRounds = 10;
-  return bcrypt.hash(password, saltRounds);
-}
 
 async function main() {
   console.log('Starting database seeding...');
@@ -16,44 +9,6 @@ async function main() {
   console.log('Clearing existing data...');
   await prisma.tag.deleteMany({});
   await prisma.page.deleteMany({});
-  await prisma.user.deleteMany({});
-
-  // Create users
-  console.log('Creating users...');
-  const password = await hashPassword('password123');
-
-  const jane = await prisma.user.create({
-    data: {
-      email: 'jane@example.com',
-      name: 'Jane Doe',
-      passwordHash: password,
-      role: 'ADMIN',
-      bio: 'AI researcher and developer with 5+ years of experience',
-      avatarUrl: 'https://i.pravatar.cc/150?img=1',
-    },
-  });
-
-  const john = await prisma.user.create({
-    data: {
-      email: 'john@example.com',
-      name: 'John Smith',
-      passwordHash: password,
-      role: 'USER',
-      bio: 'Full-stack developer specializing in API design and implementation',
-      avatarUrl: 'https://i.pravatar.cc/150?img=2',
-    },
-  });
-
-  const alex = await prisma.user.create({
-    data: {
-      email: 'alex@example.com',
-      name: 'Alex Johnson',
-      passwordHash: password,
-      role: 'USER',
-      bio: 'UX designer and frontend developer passionate about creating intuitive interfaces',
-      avatarUrl: 'https://i.pravatar.cc/150?img=3',
-    },
-  });
 
   // Create tags
   console.log('Creating tags...');
@@ -116,7 +71,8 @@ This is a comprehensive guide to getting started with AI development.
 AI development is an exciting field with endless possibilities. Whether you're interested in natural language processing, computer vision, or reinforcement learning, there's something for everyone.`,
       isPublished: true,
       viewCount: 120,
-      userId: jane.id,
+      authorName: 'Jane Doe',
+      authorEmail: 'jane@example.com',
       tags: {
         connect: [
           { id: aiTag.id },
@@ -149,7 +105,8 @@ Creating reliable and scalable APIs is essential for modern applications.
 A well-designed API can significantly improve the developer experience and the overall quality of your application.`,
       isPublished: true,
       viewCount: 85,
-      userId: john.id,
+      authorName: 'John Smith',
+      authorEmail: 'john@example.com',
       tags: {
         connect: [
           { id: apiTag.id },
@@ -181,7 +138,8 @@ Frontend development has evolved significantly in recent years, with new framewo
 Staying up-to-date with frontend development requires continuous learning and adaptation to new technologies and approaches.`,
       isPublished: true,
       viewCount: 62,
-      userId: alex.id,
+      authorName: 'Alex Johnson',
+      authorEmail: 'alex@example.com',
       tags: {
         connect: [
           { id: frontendTag.id },
@@ -214,7 +172,8 @@ Creating intuitive user experiences is crucial for the success of any digital pr
 A well-designed user experience can significantly increase user satisfaction, engagement, and conversion rates.`,
       isPublished: true,
       viewCount: 45,
-      userId: alex.id,
+      authorName: 'Alex Johnson',
+      authorEmail: 'alex@example.com',
       tags: {
         connect: [
           { id: uxTag.id },
@@ -248,11 +207,11 @@ Natural Language Processing (NLP) is a field of AI focused on enabling computers
 NLP has numerous applications, from chatbots and virtual assistants to content analysis and machine translation.`,
       isPublished: true,
       viewCount: 98,
-      userId: jane.id,
+      authorName: 'Jane Doe',
+      authorEmail: 'jane@example.com',
       tags: {
         connect: [
-          { id: aiTag.id },
-          { id: developmentTag.id }
+          { id: aiTag.id }
         ]
       }
     },
