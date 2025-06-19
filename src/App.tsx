@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Link, useNavigate, useParams } from 'react-router-dom';
 import { Container, Flex, Box, Text, Heading, Link as RadixLink, Card, Badge, Avatar, Grid, Button, Strong, Code, Separator, TextArea, TextField } from '@radix-ui/themes';
+import { Page, AIResponse } from './types';
 
 // Home page - now displays recent pages from the database
 function Home() {
-  const [pages, setPages] = useState([]);
+  const [pages, setPages] = useState<Page[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -51,7 +52,7 @@ function Home() {
         <Box pl="5" mb="3" asChild>
           <ol style={{ listStyleType: 'decimal' }}>
             <li><Text>Modify the database schema in <Code>prisma/schema.prisma</Code> for your data model</Text></li>
-            <li><Text>Add new API endpoints in <Code>index.js</Code></Text></li>
+            <li><Text>Add new API endpoints in <Code>index.ts</Code></Text></li>
             <li><Text>Create new React components in <Code>src/components/</Code></Text></li>
             <li><Text>Customize the AI integration in the <Code>ChatGPTRequest</Code> function</Text></li>
           </ol>
@@ -91,7 +92,7 @@ function Home() {
 
 // Pages component to demonstrate User and Page models
 function Pages() {
-  const [pages, setPages] = useState([]);
+  const [pages, setPages] = useState<Page[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -140,10 +141,10 @@ function Pages() {
 
 // Single Page component
 function PageDetail() {
-  const { slug } = useParams();
-  const [page, setPage] = useState(null);
+  const { slug } = useParams<{ slug: string }>();
+  const [page, setPage] = useState<Page | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchPage() {
@@ -156,17 +157,19 @@ function PageDetail() {
         setPage(data);
         setLoading(false);
       } catch (err) {
-        setError(err.message);
+        setError(err instanceof Error ? err.message : 'An error occurred');
         setLoading(false);
       }
     }
 
-    fetchPage();
+    if (slug) {
+      fetchPage();
+    }
   }, [slug]);
 
   if (loading) return (
     <Container size="3">
-      <Box py="8" textAlign="center">
+      <Box py="8" style={{ textAlign: 'center' }}>
         <Text>Loading page...</Text>
       </Box>
     </Container>
@@ -174,7 +177,7 @@ function PageDetail() {
 
   if (error) return (
     <Container size="3">
-      <Box py="8" textAlign="center">
+      <Box py="8" style={{ textAlign: 'center' }}>
         <Heading size="5" mb="4" color="red">Error</Heading>
         <Text>{error}</Text>
         <Box mt="6">
@@ -182,6 +185,14 @@ function PageDetail() {
             <Button variant="soft">Back to Pages</Button>
           </Link>
         </Box>
+      </Box>
+    </Container>
+  );
+
+  if (!page) return (
+    <Container size="3">
+      <Box py="8" style={{ textAlign: 'center' }}>
+        <Text>Page not found</Text>
       </Box>
     </Container>
   );
@@ -199,36 +210,44 @@ function PageDetail() {
             <Badge size="1">{page.category}</Badge>
           </Flex>
           
-          <Separator size="4" my="2" />
+          {page.tags && page.tags.length > 0 && (
+            <Flex gap="2" wrap="wrap">
+              {page.tags.map(tag => (
+                <Badge key={tag} size="1" variant="soft">{tag}</Badge>
+              ))}
+            </Flex>
+          )}
           
-          <Text size="3">{page.description}</Text>
+          <Separator size="4" />
           
-          <Box style={{ whiteSpace: 'pre-wrap' }}>
-            {page.content}
-          </Box>
-          
-          <Box mt="4">
-            <Link to="/pages">
-              <Button variant="soft">Back to Pages</Button>
-            </Link>
+          <Box>
+            <Text as="div" style={{ whiteSpace: 'pre-wrap' }}>
+              {page.content}
+            </Text>
           </Box>
         </Flex>
       </Card>
+      
+      <Box mt="6">
+        <Link to="/pages">
+          <Button variant="soft">Back to Pages</Button>
+        </Link>
+      </Box>
     </Container>
   );
 }
 
+// AI Demo component
 function AIDemo() {
   const [prompt, setPrompt] = useState('');
   const [response, setResponse] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError(null);
+    if (!prompt.trim()) return;
 
+    setLoading(true);
     try {
       const res = await fetch('/api/ai/generate', {
         method: 'POST',
@@ -239,94 +258,90 @@ function AIDemo() {
       });
 
       if (!res.ok) {
-        throw new Error('Failed to get AI response');
+        throw new Error('Failed to generate response');
       }
 
-      const data = await res.json();
+      const data: AIResponse = await res.json();
       setResponse(data.response);
-      setLoading(false);
-    } catch (err) {
-      setError(err.message);
+    } catch (error) {
+      console.error('Error:', error);
+      setResponse('Error generating response. Please try again.');
+    } finally {
       setLoading(false);
     }
   };
 
   return (
     <Container size="3">
+      <Heading size="6" mb="4">AI Demo</Heading>
+      <Text color="gray" mb="6">
+        Test the OpenAI integration by asking questions or requesting content generation.
+      </Text>
+      
       <Card>
-        <Flex direction="column" p="6" gap="4">
-          <Heading size="6">AI Demo</Heading>
-          <Text color="gray">Enter a prompt to generate a response using AI</Text>
-          
-          <form onSubmit={handleSubmit}>
-            <Flex direction="column" gap="3">
-              <TextArea 
-                placeholder="Enter your prompt here..."
+        <form onSubmit={handleSubmit}>
+          <Flex direction="column" p="6" gap="4">
+            <Box>
+              <Text as="div" size="2" mb="2" weight="bold">
+                Your Prompt
+              </Text>
+              <TextArea
+                placeholder="Ask me anything or request content generation..."
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
+                rows={4}
                 required
-                size="3"
               />
-              
-              <Box>
-                <Button type="submit" disabled={loading} color="purple">
-                  {loading ? 'Generating...' : 'Generate Response'}
-                </Button>
-              </Box>
-            </Flex>
-          </form>
-          
-          {error && (
-            <Box p="3" style={{ backgroundColor: 'var(--red-3)', borderRadius: 'var(--radius-3)' }}>
-              <Text color="red">{error}</Text>
             </Box>
-          )}
-          
-          {response && (
-            <Box mt="4">
-              <Heading size="4" mb="2">Response:</Heading>
-              <Box p="4" style={{ 
-                backgroundColor: 'var(--gray-2)', 
-                borderRadius: 'var(--radius-3)',
-                whiteSpace: 'pre-wrap'
-              }}>
-                <Text>{response}</Text>
-              </Box>
-            </Box>
-          )}
-        </Flex>
+            
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Generating...' : 'Generate Response'}
+            </Button>
+          </Flex>
+        </form>
       </Card>
+      
+      {response && (
+        <Card mt="4">
+          <Box p="6">
+            <Text as="div" size="2" mb="2" weight="bold">
+              AI Response
+            </Text>
+            <Text as="div" style={{ whiteSpace: 'pre-wrap' }}>
+              {response}
+            </Text>
+          </Box>
+        </Card>
+      )}
     </Container>
   );
 }
 
 function App() {
   return (
-    <Flex direction="column" style={{ minHeight: '100vh' }}>
-      <Box style={{ backgroundColor: 'var(--gray-2)' }}>
+    <Box>
+      <Box p="4" style={{ backgroundColor: 'var(--gray-1)', borderBottom: '1px solid var(--gray-6)' }}>
         <Container size="4">
-          <Flex py="4" justify="between" align="center">
-            <Flex align="center" gap="4">
-              <Link to="/" style={{ textDecoration: 'none' }}>
-                <Heading size="5" style={{ color: 'var(--gray-12)' }}>AI Prototype</Heading>
+          <Flex justify="between" align="center">
+            <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
+              <Heading size="4">AI Prototype Boilerplate</Heading>
+            </Link>
+            <Flex gap="4">
+              <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
+                <Text>Home</Text>
               </Link>
-              <Flex as="nav" gap="5">
-                <Link to="/" style={{ textDecoration: 'none', color: 'var(--gray-12)' }}>
-                  <Text>Home</Text>
-                </Link>
-                <Link to="/pages" style={{ textDecoration: 'none', color: 'var(--gray-12)' }}>
-                  <Text>Pages</Text>
-                </Link>
-                <Link to="/ai-demo" style={{ textDecoration: 'none', color: 'var(--gray-12)' }}>
-                  <Text>AI Demo</Text>
-                </Link>
-              </Flex>
+              <Link to="/pages" style={{ textDecoration: 'none', color: 'inherit' }}>
+                <Text>Pages</Text>
+              </Link>
+              <Link to="/ai-demo" style={{ textDecoration: 'none', color: 'inherit' }}>
+                <Text>AI Demo</Text>
+              </Link>
             </Flex>
           </Flex>
         </Container>
       </Box>
-
-      <Box py="8" style={{ flex: 1 }}>
+      
+      <Box py="6">
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/pages" element={<Pages />} />
@@ -334,22 +349,8 @@ function App() {
           <Route path="/ai-demo" element={<AIDemo />} />
         </Routes>
       </Box>
-
-      <Box style={{ backgroundColor: 'var(--gray-2)' }}>
-        <Container size="4">
-          <Flex py="4" justify="between" align="center">
-            <Text size="2" color="gray">© 2023 AI Prototype Boilerplate</Text>
-            <Flex gap="4">
-              <RadixLink href="https://github.com" target="_blank" size="2">GitHub</RadixLink>
-              <RadixLink href="https://openai.com" target="_blank" size="2">OpenAI</RadixLink>
-              <RadixLink href="https://radix-ui.com" target="_blank" size="2">Radix UI</RadixLink>
-            </Flex>
-          </Flex>
-        </Container>
-      </Box>
-    </Flex>
+    </Box>
   );
 }
 
-export default App;
-
+export default App; 

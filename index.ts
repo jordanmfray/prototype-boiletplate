@@ -1,9 +1,10 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-import express from 'express';
+import express, { Request, Response } from 'express';
 // Import Prisma
 import { PrismaClient } from '@prisma/client';
+import { AIRequest } from './src/types';
 const prisma = new PrismaClient();
 
 const app = express();
@@ -19,7 +20,7 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const openai = new OpenAI({apiKey: OPENAI_API_KEY});
 
 // Example API endpoint - now uses the database
-app.get('/api/example', async (req, res) => {
+app.get('/api/example', async (_req: Request, res: Response) => {
   try {
     // Fetch recent pages from the database
     const recentPages = await prisma.page.findMany({
@@ -39,7 +40,7 @@ app.get('/api/example', async (req, res) => {
 });
 
 // Get all pages
-app.get('/api/pages', async (req, res) => {
+app.get('/api/pages', async (_req: Request, res: Response) => {
   try {
     const pages = await prisma.page.findMany({
       where: { isPublished: true },
@@ -69,7 +70,7 @@ app.get('/api/pages', async (req, res) => {
 });
 
 // Get a single page by slug
-app.get('/api/pages/:slug', async (req, res) => {
+app.get('/api/pages/:slug', async (req: Request<{ slug: string }>, res: Response) => {
   try {
     const { slug } = req.params;
     
@@ -106,7 +107,7 @@ app.get('/api/pages/:slug', async (req, res) => {
 });
 
 // AI endpoint
-app.post('/api/ai/generate', async (req, res) => {
+app.post('/api/ai/generate', async (req: Request<{}, {}, AIRequest>, res: Response) => {
   try {
     const { prompt } = req.body;
     
@@ -124,7 +125,7 @@ app.post('/api/ai/generate', async (req, res) => {
 });
 
 // Function to make requests to ChatGPT
-async function ChatGPTRequest(prompt, model = "gpt-4o-mini") {
+async function ChatGPTRequest(prompt: string, model: string = "gpt-4o-mini"): Promise<string> {
   try {
     const completion = await openai.chat.completions.create({
       model: model,
@@ -136,7 +137,7 @@ async function ChatGPTRequest(prompt, model = "gpt-4o-mini") {
       max_tokens: 500
     });
     
-    return completion.choices[0].message.content;
+    return completion.choices[0].message.content || '';
   } catch (error) {
     console.error('Error making OpenAI request:', error);
     throw new Error('Failed to generate AI response');
@@ -145,4 +146,4 @@ async function ChatGPTRequest(prompt, model = "gpt-4o-mini") {
 
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
-});
+}); 

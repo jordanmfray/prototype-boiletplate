@@ -20,19 +20,10 @@ export default defineConfig({
     minify: true,
     sourcemap: true
   },
-  // Use custom template
-  template: {
-    transformIndexHtml: (html) => {
-      return html.replace(
-        /__WS_TOKEN__/g,
-        'development'
-      );
-    }
-  },
   resolve: {
     alias: {
       '@': resolve(__dirname, './src')
     },
-    extensions: ['.js', '.jsx', '.json']
+    extensions: ['.ts', '.tsx', '.js', '.jsx', '.json']
   }
 }); 
